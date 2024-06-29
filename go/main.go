@@ -12,11 +12,12 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"sync"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	// "github.com/labstack/echo/v4/middleware"
 
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
@@ -117,11 +118,40 @@ func initializeHandler(c echo.Context) error {
 	}
 	InitCache()
 	InitTagsCache()
+	InitThemeCache()
+	updateUsersMap()
 
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
 	})
+}
+
+var (
+	usersMap sync.Map
+)
+
+func getUserById(id int64) (UserModel, error) {
+	v, ok := usersMap.Load(id)
+	if !ok {
+		return UserModel{}, fmt.Errorf("user not found")
+	}
+
+	return v.(UserModel), nil
+}
+
+func updateUsersMap() error {
+	var users []UserModel
+	if err := dbConn.Select(&users, "SELECT * FROM users"); err != nil {
+		return err
+	}
+
+	usersMap = sync.Map{}
+	for _, user := range users {
+		usersMap.Store(user.ID, user)
+	}
+
+	return nil
 }
 
 func main() {
@@ -131,9 +161,9 @@ func main() {
 	}()
 
 	e := echo.New()
-	e.Debug = true
-	e.Logger.SetLevel(echolog.DEBUG)
-	e.Use(middleware.Logger())
+	e.Debug = false
+	e.Logger.SetLevel(echolog.OFF)
+	// e.Use(middleware.Logger())
 	cookieStore := sessions.NewCookieStore(secret)
 	cookieStore.Options.Domain = "*.t.isucon.pw"
 	e.Use(session.Middleware(cookieStore))
@@ -210,6 +240,8 @@ func main() {
 		os.Exit(1)
 	}
 	powerDNSSubdomainAddress = subdomainAddr
+
+	updateUsersMap()
 
 	// HTTPサーバ起動
 	listenAddr := net.JoinHostPort("", strconv.Itoa(listenPort))
