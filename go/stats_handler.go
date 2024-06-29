@@ -223,23 +223,65 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 
 	// ランク算出
 	var ranking LivestreamRanking
+
+	// まずlivestreamsのIDをすべて取得
+	var livestreamIDs []int64
 	for _, livestream := range livestreams {
-		var reactions int64
-		if err := tx.GetContext(ctx, &reactions, "SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON l.id = r.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-		}
+		livestreamIDs = append(livestreamIDs, livestream.ID)
+	}
 
-		var totalTips int64
-		if err := tx.GetContext(ctx, &totalTips, "SELECT IFNULL(SUM(l2.tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l.id = l2.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-		}
+	// reactionsの合計を取得するクエリ
+	var reactions []struct {
+		LivestreamID int64
+		Reactions    int64
+	}
+	query := `SELECT l.id AS LivestreamID, COUNT(r.id) AS Reactions
+          FROM livestreams l
+          LEFT JOIN reactions r ON l.id = r.livestream_id
+          WHERE l.id IN (?) 
+          GROUP BY l.id`
+	err = tx.SelectContext(ctx, &reactions, query, livestreamIDs)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch reactions: "+err.Error())
+	}
 
-		score := reactions + totalTips
+	// tipsの合計を取得するクエリ
+	var tips []struct {
+		LivestreamID int64
+		TotalTips    int64
+	}
+	query = `SELECT l.id AS LivestreamID, IFNULL(SUM(l2.tip), 0) AS TotalTips
+         FROM livestreams l
+         LEFT JOIN livecomments l2 ON l.id = l2.livestream_id
+         WHERE l.id IN (?) 
+         GROUP BY l.id`
+	err = tx.SelectContext(ctx, &tips, query, livestreamIDs)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fetch tips: "+err.Error())
+	}
+
+	// 合計スコアを計算してランキングに追加
+	scoreMap := make(map[int64]int64)
+	for _, reaction := range reactions {
+		scoreMap[reaction.LivestreamID] += reaction.Reactions
+	}
+	for _, tip := range tips {
+		scoreMap[tip.LivestreamID] += tip.TotalTips
+	}
+
+	// ランキングエントリーを構築
+	for _, livestream := range livestreams {
+		score, found := scoreMap[livestream.ID]
+		if !found {
+			score = 0
+		}
 		ranking = append(ranking, LivestreamRankingEntry{
 			LivestreamID: livestream.ID,
 			Score:        score,
 		})
 	}
+
+	// ランキングをスコアでソート
 	sort.Sort(ranking)
 
 	var rank int64 = 1
