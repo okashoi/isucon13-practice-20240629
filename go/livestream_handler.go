@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,8 +17,27 @@ import (
 )
 
 var (
-	TagsByLivestreamID map[int64][]Tag
+	tagsByLivestreamID sync.Map
 )
+
+func setTagsByLivestreamID(livestreamID int64, tags []Tag) {
+	tagsByLivestreamID.Store(livestreamID, tags)
+}
+
+func getTagsByLivestreamID(livestreamID int64) ([]Tag, bool) {
+	var tags []Tag
+	tagsAny, ok := tagsByLivestreamID.Load(livestreamID)
+	if !ok {
+		return tags, false
+	}
+
+	tags = tagsAny.([]Tag)
+	return tags, true
+}
+
+func InitTagsCache() {
+	tagsByLivestreamID = sync.Map{}
+}
 
 type ReserveLivestreamRequest struct {
 	Tags         []int64 `json:"tags"`
@@ -153,26 +173,29 @@ func reserveLivestreamHandler(c echo.Context) error {
 	livestreamModel.ID = livestreamID
 
 	// タグ追加
-	var tags []*TagModel
 	if (len(req.Tags)) > 0 {
 		q := "SELECT * FROM tags WHERE id IN (?)"
 		query, params, err := sqlx.In(q, req.Tags)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
 		}
-		if err := tx.SelectContext(ctx, &tags, query, params...); err != nil {
+		var tagModels []*TagModel
+		if err := tx.SelectContext(ctx, &tagModels, query, params...); err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
 		}
-		TagsByLivestreamID[livestreamID] = make([]Tag, len(req.Tags))
-		for _, tag := range tags {
-			TagsByLivestreamID[livestreamID] = append(TagsByLivestreamID[livestreamID], Tag{
-				ID:   tag.ID,
-				Name: tag.Name,
+
+		tags := make([]Tag, len(tagModels))
+		for _, tagModel := range tagModels {
+			tags = append(tags, Tag{
+				ID:   tagModel.ID,
+				Name: tagModel.Name,
 			})
 		}
+		setTagsByLivestreamID(livestreamID, tags)
 	} else {
-		TagsByLivestreamID[livestreamID] = make([]Tag, 0)
+		setTagsByLivestreamID(livestreamID, make([]Tag, 0))
 	}
+
 	for _, tagID := range req.Tags {
 		if _, err := tx.NamedExecContext(ctx, "INSERT INTO livestream_tags (livestream_id, tag_id) VALUES (:livestream_id, :tag_id)", &LivestreamTagModel{
 			LivestreamID: livestreamID,
@@ -519,7 +542,7 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 	}
 
 	var tags []Tag
-	if tagsOnMemory, ok := TagsByLivestreamID[livestreamModel.ID]; ok {
+	if tagsOnMemory, ok := getTagsByLivestreamID(livestreamModel.ID); ok {
 		tags = tagsOnMemory
 	} else {
 		var tagModels []*TagModel
