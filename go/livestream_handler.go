@@ -15,6 +15,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+var (
+	TagsByLivestreamID map[int64][]Tag
+)
+
 type ReserveLivestreamRequest struct {
 	Tags         []int64 `json:"tags"`
 	Title        string  `json:"title"`
@@ -149,6 +153,22 @@ func reserveLivestreamHandler(c echo.Context) error {
 	livestreamModel.ID = livestreamID
 
 	// タグ追加
+	var tags []*TagModel
+	q := "SELECT * FROM tags WHERE id IN (?)"
+	query, params, err := sqlx.In(q, req.Tags)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
+	}
+	if err := tx.SelectContext(ctx, &tags, query, params...); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
+	}
+	TagsByLivestreamID[livestreamID] = make([]Tag, len(req.Tags))
+	for _, tag := range tags {
+		TagsByLivestreamID[livestreamID] = append(TagsByLivestreamID[livestreamID], Tag{
+			ID:   tag.ID,
+			Name: tag.Name,
+		})
+	}
 	for _, tagID := range req.Tags {
 		if _, err := tx.NamedExecContext(ctx, "INSERT INTO livestream_tags (livestream_id, tag_id) VALUES (:livestream_id, :tag_id)", &LivestreamTagModel{
 			LivestreamID: livestreamID,
@@ -494,16 +514,19 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 		return Livestream{}, err
 	}
 
-	var tagModels []*TagModel
-	if err := tx.SelectContext(ctx, &tagModels, "SELECT tags.* FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id = ?", livestreamModel.ID); err != nil {
-		return Livestream{}, err
-	}
-
-	tags := make([]Tag, len(tagModels))
-	for i := range tagModels {
-		tags[i] = Tag{
-			ID:   tagModels[i].ID,
-			Name: tagModels[i].Name,
+	var tags []Tag
+	if tagsOnMemory, ok := TagsByLivestreamID[livestreamModel.ID]; ok {
+		tags = tagsOnMemory
+	} else {
+		var tagModels []*TagModel
+		if err := tx.SelectContext(ctx, &tagModels, "SELECT tags.* FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id = ?", livestreamModel.ID); err != nil {
+			return Livestream{}, err
+		}
+		for i := range tagModels {
+			tags[i] = Tag{
+				ID:   tagModels[i].ID,
+				Name: tagModels[i].Name,
+			}
 		}
 	}
 
