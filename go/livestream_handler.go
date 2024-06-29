@@ -173,28 +173,6 @@ func reserveLivestreamHandler(c echo.Context) error {
 	livestreamModel.ID = livestreamID
 
 	// タグ追加
-	if len(req.Tags) > 0 {
-		query, params, err := sqlx.In("SELECT * FROM tags WHERE id IN (?)", req.Tags)
-		if err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
-		}
-		var tagModels []*TagModel
-		if err := tx.SelectContext(ctx, &tagModels, query, params...); err != nil {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get tags: "+err.Error())
-		}
-
-		tags := make([]Tag, len(tagModels))
-		for _, tagModel := range tagModels {
-			tags = append(tags, Tag{
-				ID:   tagModel.ID,
-				Name: tagModel.Name,
-			})
-		}
-		setTagsByLivestreamID(livestreamID, tags)
-	} else {
-		setTagsByLivestreamID(livestreamID, make([]Tag, 0))
-	}
-
 	for _, tagID := range req.Tags {
 		if _, err := tx.NamedExecContext(ctx, "INSERT INTO livestream_tags (livestream_id, tag_id) VALUES (:livestream_id, :tag_id)", &LivestreamTagModel{
 			LivestreamID: livestreamID,
