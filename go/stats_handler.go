@@ -147,7 +147,7 @@ func getUserStatisticsHandler(c echo.Context) error {
 		TotalLivecomments int64
 		TotalTip          int64
 	}
-	if err := tx.SelectContext(ctx, &result, "SELECT COUNT(*), SUM(livecomments.tip) FROM livecomments INNER JOIN livestreams ON livecomments.livestream_id = livestreams.id WHERE livestreams.user_id = ?", targetUser.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err := tx.GetContext(ctx, &result, "SELECT COUNT(*), SUM(livecomments.tip) FROM livecomments INNER JOIN livestreams ON livecomments.livestream_id = livestreams.id WHERE livestreams.user_id = ?", targetUser.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
 	}
 	totalTip := result.TotalTip
