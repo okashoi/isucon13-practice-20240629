@@ -173,9 +173,8 @@ func reserveLivestreamHandler(c echo.Context) error {
 	livestreamModel.ID = livestreamID
 
 	// タグ追加
-	if (len(req.Tags)) > 0 {
-		q := "SELECT * FROM tags WHERE id IN (?)"
-		query, params, err := sqlx.In(q, req.Tags)
+	if len(req.Tags) > 0 {
+		query, params, err := sqlx.In("SELECT * FROM tags WHERE id IN (?)", req.Tags)
 		if err != nil {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to construct IN query: "+err.Error())
 		}
@@ -555,6 +554,7 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 				Name: tagModels[i].Name,
 			}
 		}
+		setTagsByLivestreamID(livestreamModel.ID, tags)
 	}
 
 	livestream := Livestream{
