@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/felixge/fgprof"
 	"log"
 	"net"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/gorilla/sessions"
 	"github.com/labstack/echo-contrib/session"
 	echolog "github.com/labstack/gommon/log"
+	_ "net/http/pprof"
 )
 
 const (
@@ -119,6 +121,11 @@ func initializeHandler(c echo.Context) error {
 }
 
 func main() {
+	http.DefaultServeMux.Handle("/debug/fgprof", fgprof.Handler())
+	go func() {
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
+
 	e := echo.New()
 	e.Debug = true
 	e.Logger.SetLevel(echolog.DEBUG)
