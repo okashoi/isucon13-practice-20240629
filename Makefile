@@ -3,6 +3,8 @@
 gogo: stop-services build truncate-logs start-services
 
 stop-services:
+	sudo systemctl stop dnsdist
+	sudo systemctl stop pdns
 	sudo systemctl stop nginx
 	sudo systemctl stop isupipe-go.service
 	ssh isucon-s3 "sudo systemctl stop mysql"
@@ -25,6 +27,8 @@ start-services:
 	sudo systemctl start mysql
 	sudo systemctl start isupipe-go.service
 	sudo systemctl start nginx
+	sudo systemctl start pdns
+	sudo systemctl start dnsdist
 
 kataribe: timestamp=$(shell TZ=Asia/Tokyo date "+%Y%m%d-%H%M%S")
 kataribe:
