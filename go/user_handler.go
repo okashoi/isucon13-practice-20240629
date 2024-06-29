@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,10 +87,36 @@ type PostIconResponse struct {
 	ID int64 `json:"id"`
 }
 
+var (
+	iconHashCacheByUsername sync.Map
+)
+
+func addIconHashByUsername(username string, hash string) {
+	iconHashCacheByUsername.Store(username, hash)
+}
+
+func getIconHashByUsername(username string) (string, bool) {
+	hash, ok := iconHashCacheByUsername.Load(username)
+	if !ok {
+		return "", false
+	}
+	return hash.(string), true
+}
+
+func InitCache() {
+	iconHashCacheByUsername = sync.Map{}
+}
+
 func getIconHandler(c echo.Context) error {
 	ctx := c.Request().Context()
 
 	username := c.Param("username")
+
+	ifNoneMatch := c.Request().Header.Get("If-None-Match")
+	hash, found := getIconHashByUsername(username)
+	if found && hash == strings.Trim(ifNoneMatch, "\"") {
+		return c.NoContent(http.StatusNotModified)
+	}
 
 	tx, err := dbConn.BeginTxx(ctx, nil)
 	if err != nil {
@@ -415,7 +443,7 @@ func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (Us
 		}
 	}
 	iconHash := sha256.Sum256(image)
-
+	addIconHashByUsername(userModel.Name, fmt.Sprintf("%x", iconHash))
 	user := User{
 		ID:          userModel.ID,
 		Name:        userModel.Name,
