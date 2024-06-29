@@ -87,40 +87,39 @@ func getUserStatisticsHandler(c echo.Context) error {
 	}
 
 	// ランク算出
+	userScore := make(map[int64]int64)
+	var result1 []*struct {
+		UserID        int64 `db:"user_id"`
+		ReactionCount int64 `db:"reactions_count"`
+	}
+	if err := tx.SelectContext(ctx, &result1, "SELECT ls.user_id as user_id, COUNT(*) as reactions_count FROM livestreams ls INNER JOIN reactions r ON ls.id = r.livestream_id GROUP BY ls.user_id"); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
+	}
+	for _, res := range result1 {
+		userScore[res.UserID] = res.ReactionCount
+	}
+
+	var result2 []*struct {
+		UserID   int64 `db:"user_id"`
+		TotalTip int64 `db:"total_tip"`
+	}
+	if err := tx.SelectContext(ctx, &result2, "SELECT ls.user_id as user_id, IFNULL(SUM(lc.tip), 0) as total_tip FROM livestreams ls INNER JOIN livecomments lc ON ls.id = lc.livestream_id GROUP BY ls.user_id"); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
+	}
+	for _, res := range result2 {
+		userScore[res.UserID] += res.TotalTip
+	}
+
 	var users []*UserModel
 	if err := tx.SelectContext(ctx, &users, "SELECT * FROM users"); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get users: "+err.Error())
 	}
 
-	userScore := make(map[string]int64)
-
-	var result1 []*struct {
-		Username      string `db:"username"`
-		ReactionCount int64  `db:"reactions_count"`
-	}
-	if err := tx.SelectContext(ctx, &result1, "SELECT u.name as username, COUNT(r.id) as reactions_count FROM livestreams ls INNER JOIN reactions r ON ls.id = r.livestream_id INNER JOIN users u ON ls.user_id = u.id GROUP BY u.name"); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-	}
-	for _, res := range result1 {
-		userScore[res.Username] = res.ReactionCount
-	}
-
-	var result2 []*struct {
-		Username string `db:"username"`
-		TotalTip int64  `db:"total_tip"`
-	}
-	if err := tx.SelectContext(ctx, &result2, "SELECT u.name as username, IFNULL(SUM(lc.tip), 0) as total_tip FROM livestreams ls INNER JOIN livecomments lc ON ls.id = lc.livestream_id INNER JOIN users u ON ls.user_id = u.id GROUP BY u.name"); err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-	}
-	for _, res := range result2 {
-		userScore[res.Username] += res.TotalTip
-	}
-
 	var ranking UserRanking
-	for name, score := range userScore {
+	for _, user := range users {
 		ranking = append(ranking, UserRankingEntry{
-			Username: name,
-			Score:    score,
+			Username: user.Name,
+			Score:    userScore[user.ID],
 		})
 	}
 	sort.Sort(ranking)
