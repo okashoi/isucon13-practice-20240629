@@ -25,14 +25,15 @@ func setTagsByLivestreamID(livestreamID int64, tags []Tag) {
 }
 
 func getTagsByLivestreamID(livestreamID int64) ([]Tag, bool) {
-	var tags []Tag
-	tagsAny, ok := tagsByLivestreamID.Load(livestreamID)
+	tags, ok := tagsByLivestreamID.Load(livestreamID)
 	if !ok {
-		return tags, false
+		return nil, false
 	}
+	return tags.([]Tag), true
+}
 
-	tags = tagsAny.([]Tag)
-	return tags, true
+func deleteTagsByLivestreamID(livestreamID int64) {
+	tagsByLivestreamID.Delete(livestreamID)
 }
 
 func InitTagsCache() {
@@ -181,6 +182,8 @@ func reserveLivestreamHandler(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert livestream tag: "+err.Error())
 		}
 	}
+
+	deleteTagsByLivestreamID(livestreamID)
 
 	livestream, err := fillLivestreamResponse(ctx, tx, *livestreamModel)
 	if err != nil {
