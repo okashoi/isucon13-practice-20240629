@@ -107,13 +107,13 @@ func getUserStatisticsHandler(c echo.Context) error {
 
 	var result2 []*struct {
 		Username string `db:"username"`
-		totalTip int64  `db:"total_tip"`
+		TotalTip int64  `db:"total_tip"`
 	}
 	if err := tx.SelectContext(ctx, &result2, "SELECT u.name as username, IFNULL(SUM(lc.tip), 0) as total_tip FROM livestreams ls INNER JOIN livecomments lc ON ls.id = lc.livestream_id INNER JOIN users u ON ls.user_id = u.id GROUP BY u.name"); err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
 	}
 	for _, res := range result2 {
-		userScore[res.Username] += res.totalTip
+		userScore[res.Username] += res.TotalTip
 	}
 
 	var ranking UserRanking
