@@ -434,8 +434,14 @@ func verifyUserSession(c echo.Context) error {
 
 func fillUserResponse(ctx context.Context, tx *sqlx.Tx, userModel UserModel) (User, error) {
 	themeModel := ThemeModel{}
-	if err := tx.GetContext(ctx, &themeModel, "SELECT * FROM themes WHERE user_id = ?", userModel.ID); err != nil {
-		return User{}, err
+
+	// themeがcacheされているか確認
+	themeModel, found := GetThemeCache(userModel.ID)
+	if !found {
+		if err := tx.GetContext(ctx, &themeModel, "SELECT * FROM themes WHERE user_id = ?", userModel.ID); err != nil {
+			return User{}, err
+		}
+		AddThemeCache(userModel.ID, themeModel)
 	}
 
 	iconHash, found := getIconHashByUsername(userModel.Name)
