@@ -16,6 +16,7 @@ CREATE TABLE `icons` (
   `user_id` BIGINT NOT NULL,
   `image` LONGBLOB NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index icons_user_id_index on icons (user_id);
 
 -- ユーザごとのカスタムテーマ
 CREATE TABLE `themes` (
@@ -23,6 +24,8 @@ CREATE TABLE `themes` (
   `user_id` BIGINT NOT NULL,
   `dark_mode` BOOLEAN NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index themes_user_id_index on themes (user_id);
+
 
 -- ライブ配信
 CREATE TABLE `livestreams` (
@@ -35,6 +38,8 @@ CREATE TABLE `livestreams` (
   `start_at` BIGINT NOT NULL,
   `end_at` BIGINT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index livestreams_user_id_index on livestreams (user_id);
+
 
 -- ライブ配信予約枠
 CREATE TABLE `reservation_slots` (
@@ -57,6 +62,7 @@ CREATE TABLE `livestream_tags` (
   `livestream_id` BIGINT NOT NULL,
   `tag_id` BIGINT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index livestream_tags_livestream_id_index on livestream_tags (livestream_id);
 
 -- ライブ配信視聴履歴
 CREATE TABLE `livestream_viewers_history` (
@@ -75,6 +81,8 @@ CREATE TABLE `livecomments` (
   `tip` BIGINT NOT NULL DEFAULT 0,
   `created_at` BIGINT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index livecomments_user_id_index on livecomments (user_id);
+create index livecomments_livestream_id_index on livecomments (livestream_id);
 
 -- ユーザからのライブコメントのスパム報告
 CREATE TABLE `livecomment_reports` (
@@ -104,3 +112,5 @@ CREATE TABLE `reactions` (
   `emoji_name` VARCHAR(255) NOT NULL,
   `created_at` BIGINT NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
+create index reactions_livestream_id_index
+    on reactions (livestream_id);
