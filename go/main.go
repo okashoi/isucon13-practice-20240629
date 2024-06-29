@@ -117,6 +117,7 @@ func initializeHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
 	InitCache()
+	InitTagsCache()
 	InitThemeCache()
 	updateUsersMap()
 

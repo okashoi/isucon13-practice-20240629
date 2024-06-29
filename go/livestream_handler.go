@@ -8,12 +8,36 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
 )
+
+var (
+	tagsByLivestreamID sync.Map
+)
+
+func setTagsByLivestreamID(livestreamID int64, tags []Tag) {
+	tagsByLivestreamID.Store(livestreamID, tags)
+}
+
+func getTagsByLivestreamID(livestreamID int64) ([]Tag, bool) {
+	var tags []Tag
+	tagsAny, ok := tagsByLivestreamID.Load(livestreamID)
+	if !ok {
+		return tags, false
+	}
+
+	tags = tagsAny.([]Tag)
+	return tags, true
+}
+
+func InitTagsCache() {
+	tagsByLivestreamID = sync.Map{}
+}
 
 type ReserveLivestreamRequest struct {
 	Tags         []int64 `json:"tags"`
@@ -494,17 +518,22 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 		return Livestream{}, err
 	}
 
-	var tagModels []*TagModel
-	if err := tx.SelectContext(ctx, &tagModels, "SELECT tags.* FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id = ?", livestreamModel.ID); err != nil {
-		return Livestream{}, err
-	}
-
-	tags := make([]Tag, len(tagModels))
-	for i := range tagModels {
-		tags[i] = Tag{
-			ID:   tagModels[i].ID,
-			Name: tagModels[i].Name,
+	var tags []Tag
+	if tagsOnMemory, ok := getTagsByLivestreamID(livestreamModel.ID); ok {
+		tags = tagsOnMemory
+	} else {
+		var tagModels []*TagModel
+		if err := tx.SelectContext(ctx, &tagModels, "SELECT tags.* FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id = ?", livestreamModel.ID); err != nil {
+			return Livestream{}, err
 		}
+		tags = make([]Tag, len(tagModels))
+		for i := range tagModels {
+			tags[i] = Tag{
+				ID:   tagModels[i].ID,
+				Name: tagModels[i].Name,
+			}
+		}
+		setTagsByLivestreamID(livestreamModel.ID, tags)
 	}
 
 	livestream := Livestream{
