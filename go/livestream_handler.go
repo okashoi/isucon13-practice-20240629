@@ -526,6 +526,7 @@ func fillLivestreamResponse(ctx context.Context, tx *sqlx.Tx, livestreamModel Li
 		if err := tx.SelectContext(ctx, &tagModels, "SELECT tags.* FROM livestream_tags INNER JOIN tags ON livestream_tags.tag_id = tags.id WHERE livestream_id = ?", livestreamModel.ID); err != nil {
 			return Livestream{}, err
 		}
+		tags = make([]Tag, len(tagModels))
 		for i := range tagModels {
 			tags[i] = Tag{
 				ID:   tagModels[i].ID,
