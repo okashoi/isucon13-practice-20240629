@@ -3,9 +3,12 @@
 gogo: stop-services build truncate-logs start-services
 
 stop-services:
+	sudo systemctl stop dnsdist
+	sudo systemctl stop pdns
 	sudo systemctl stop nginx
 	sudo systemctl stop isupipe-go.service
 	ssh isucon-s3 "sudo systemctl stop mysql"
+	sudo systemctl stop mysql
 
 build:
 	cd go && make
@@ -16,11 +19,16 @@ truncate-logs:
 	sudo truncate --size 0 /var/log/nginx/error.log
 	ssh isucon-s3 "sudo truncate --size 0 /var/log/mysql/mysql-slow.log && sudo chmod 666 /var/log/mysql/mysql-slow.log"
 	ssh isucon-s3 "sudo truncate --size 0 /var/log/mysql/error.log"
+	sudo truncate --size 0 /var/log/mysql/mysql-slow.log && sudo chmod 666 /var/log/mysql/mysql-slow.log
+	sudo truncate --size 0 /var/log/mysql/error.log
 
 start-services:
 	ssh isucon-s3 "sudo systemctl start mysql"
+	sudo systemctl start mysql
 	sudo systemctl start isupipe-go.service
 	sudo systemctl start nginx
+	sudo systemctl start pdns
+	sudo systemctl start dnsdist
 
 kataribe: timestamp=$(shell TZ=Asia/Tokyo date "+%Y%m%d-%H%M%S")
 kataribe:
