@@ -16,17 +16,17 @@ var (
 )
 
 func addScoreByLivestreamID(livestreamID, score int64) {
-	currentScore, _ := getScoreByLivestreamID(livestreamID)
+	currentScore := getScoreByLivestreamID(livestreamID)
 	scoreByLivestreamID.Store(livestreamID, currentScore+score)
 }
 
-func getScoreByLivestreamID(livestreamID int64) (int64, bool) {
+func getScoreByLivestreamID(livestreamID int64) int64 {
 	scoreAny, ok := scoreByLivestreamID.Load(livestreamID)
 	if !ok {
-		return 0, false
+		return 0
 	}
 
-	return scoreAny.(int64), true
+	return scoreAny.(int64)
 }
 
 func InitScoreCache() {
@@ -247,10 +247,7 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 	// ランク算出
 	var ranking LivestreamRanking
 	for _, livestream := range livestreams {
-		score, ok := getScoreByLivestreamID(livestreamID)
-		if !ok {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get score by livestream_id")
-		}
+		score := getScoreByLivestreamID(livestream.ID)
 		ranking = append(ranking, LivestreamRankingEntry{
 			LivestreamID: livestream.ID,
 			Score:        score,

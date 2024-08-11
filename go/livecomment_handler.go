@@ -240,7 +240,6 @@ func postLivecommentHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted livecomment id: "+err.Error())
 	}
 	livecommentModel.ID = livecommentID
-	addScoreByLivestreamID(livecommentID, req.Tip)
 
 	livecomment, err := fillLivecommentResponse(ctx, tx, livecommentModel)
 	if err != nil {
@@ -250,6 +249,7 @@ func postLivecommentHandler(c echo.Context) error {
 	if err := tx.Commit(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
+	addScoreByLivestreamID(livecommentID, req.Tip)
 
 	return c.JSON(http.StatusCreated, livecomment)
 }
