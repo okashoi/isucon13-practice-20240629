@@ -13,7 +13,7 @@ stop-services:
 
 build:
 	cd go && make
-	scp go/isupipe-go isucon-s2:/home/isucon/isupipe-go
+	scp go/isupipe isucon-s2:/home/isucon/webapp/go/isupipe
 
 truncate-logs:
 	sudo journalctl --vacuum-size=1K
