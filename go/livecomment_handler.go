@@ -249,7 +249,7 @@ func postLivecommentHandler(c echo.Context) error {
 	if err := tx.Commit(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
-	addScoreByLivestreamID(livecommentID, req.Tip)
+	addScoreByLivestreamID(int64(livestreamID), req.Tip)
 
 	return c.JSON(http.StatusCreated, livecomment)
 }
