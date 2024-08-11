@@ -7,11 +7,13 @@ stop-services:
 	sudo systemctl stop pdns
 	sudo systemctl stop nginx
 	sudo systemctl stop isupipe-go.service
+	ssh isucon-s2 "sudo systemctl stop isupipe-go.service"
 	ssh isucon-s3 "sudo systemctl stop mysql"
 	sudo systemctl stop mysql
 
 build:
 	cd go && make
+	scp go/isupipe isucon-s2:/home/isucon/webapp/go/isupipe
 
 truncate-logs:
 	sudo journalctl --vacuum-size=1K
@@ -26,6 +28,7 @@ start-services:
 	ssh isucon-s3 "sudo systemctl start mysql"
 	sudo systemctl start mysql
 	sudo systemctl start isupipe-go.service
+	ssh isucon-s2 "sudo systemctl start isupipe-go.service"
 	sudo systemctl start nginx
 	sudo systemctl start pdns
 	sudo systemctl start dnsdist
