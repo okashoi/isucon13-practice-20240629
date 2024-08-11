@@ -128,6 +128,7 @@ func postReactionHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get last inserted reaction id: "+err.Error())
 	}
 	reactionModel.ID = reactionID
+	addScoreByLivestreamID(int64(livestreamID), 1)
 
 	reaction, err := fillReactionResponse(ctx, tx, reactionModel)
 	if err != nil {

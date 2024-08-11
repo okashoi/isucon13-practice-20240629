@@ -6,9 +6,32 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/labstack/echo/v4"
 )
+
+var (
+	scoreByLivestreamID sync.Map
+)
+
+func addScoreByLivestreamID(livestreamID, score int64) {
+	currentScore, _ := getScoreByLivestreamID(livestreamID)
+	scoreByLivestreamID.Store(livestreamID, currentScore+score)
+}
+
+func getScoreByLivestreamID(livestreamID int64) (int64, bool) {
+	scoreAny, ok := scoreByLivestreamID.Load(livestreamID)
+	if !ok {
+		return 0, false
+	}
+
+	return scoreAny.(int64), true
+}
+
+func InitScoreCache() {
+	scoreByLivestreamID = sync.Map{}
+}
 
 type LivestreamStatistics struct {
 	Rank           int64 `json:"rank"`
@@ -224,17 +247,7 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 	// ランク算出
 	var ranking LivestreamRanking
 	for _, livestream := range livestreams {
-		var reactions int64
-		if err := tx.GetContext(ctx, &reactions, "SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON l.id = r.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-		}
-
-		var totalTips int64
-		if err := tx.GetContext(ctx, &totalTips, "SELECT IFNULL(SUM(l2.tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l.id = l2.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-		}
-
-		score := reactions + totalTips
+		score, _ := getScoreByLivestreamID(livestreamID)
 		ranking = append(ranking, LivestreamRankingEntry{
 			LivestreamID: livestream.ID,
 			Score:        score,
