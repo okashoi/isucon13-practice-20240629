@@ -139,11 +139,17 @@ var (
 
 func getUserById(id int64) (UserModel, error) {
 	v, ok := usersMap.Load(id)
-	if !ok {
-		return UserModel{}, fmt.Errorf("user not found")
+	if ok {
+		return v.(UserModel), nil
 	}
 
-	return v.(UserModel), nil
+	// キャッシュにヒットしなかったら DB を見に行く
+	var user UserModel
+	if err := dbConn.Get(&user, "SELECT * FROM users WHERE id = ?", id); err != nil {
+		return user, err
+	}
+	usersMap.Store(id, user)
+	return user, nil
 }
 
 func updateUsersMap() error {
@@ -222,6 +228,7 @@ func main() {
 	e.GET("/api/user/:username/statistics", getUserStatisticsHandler)
 	e.GET("/api/user/:username/icon", getIconHandler)
 	e.POST("/api/icon", postIconHandler)
+	e.POST("/api/user/:username/icon/cache", postIconCacheHandler)
 
 	// stats
 	// ライブ配信統計情報

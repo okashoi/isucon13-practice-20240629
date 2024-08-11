@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -84,6 +85,10 @@ type PostIconRequest struct {
 
 type PostIconResponse struct {
 	ID int64 `json:"id"`
+}
+
+type PostIconCacheRequest struct {
+	IconHash string `json:"icon_hash"`
 }
 
 var (
@@ -175,11 +180,60 @@ func postIconHandler(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get user: "+err.Error())
 	}
-	addIconHashByUsername(userModel.Name, fmt.Sprintf("%x", sha256.Sum256(req.Image)))
+	go notifyIconUpdated(userModel.Name, fmt.Sprintf("%x", sha256.Sum256(req.Image)))
 
 	return c.JSON(http.StatusCreated, &PostIconResponse{
 		ID: iconID,
 	})
+}
+
+func notifyIconUpdated(username, iconHash string) {
+	urls := []string{
+		fmt.Sprintf("http://192.168.0.11:8080/api/user/%s/icon/cache", username),
+		fmt.Sprintf("http://192.168.0.12:8080/api/user/%s/icon/cache", username),
+	}
+
+	reqBody, err := json.Marshal(PostIconCacheRequest{IconHash: iconHash})
+	if err != nil {
+		fmt.Printf("failed to marshal request body: %v", err)
+		return
+	}
+
+	for _, url := range urls {
+		go func(url string) {
+			req, err := http.NewRequest("POST", url, bytes.NewBuffer(reqBody))
+			if err != nil {
+				fmt.Printf("failed to create request: %v", err)
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			client := &http.Client{}
+			resp, err := client.Do(req)
+			if err != nil {
+				fmt.Printf("failed to send request to %s: %v", url, err)
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusNoContent {
+				fmt.Printf("unexpected status code from %s: %d", url, resp.StatusCode)
+			}
+		}(url)
+	}
+}
+
+func postIconCacheHandler(c echo.Context) error {
+	username := c.Param("username")
+
+	var req *PostIconCacheRequest
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "failed to decode the request body as json")
+	}
+
+	addIconHashByUsername(username, req.IconHash)
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 func getMeHandler(c echo.Context) error {
