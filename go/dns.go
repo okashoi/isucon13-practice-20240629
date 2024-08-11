@@ -1324,6 +1324,7 @@ func startDNS() error {
 			}
 			m.Extra = []dns.RR{
 				NewRR("ns1.t.isucon.pw. 120 IN A 192.168.0.11"),
+				NewRR("ns1.t.isucon.pw. 120 IN A 192.168.0.12"),
 			}
 		} else {
 			muSubDomains.RLock()
