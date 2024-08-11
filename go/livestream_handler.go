@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	tagsByLivestreamID sync.Map
+	LivestreamModelsCache sync.Map
+	tagsByLivestreamID    sync.Map
 )
 
 func setTagsByLivestreamID(livestreamID int64, tags []Tag) {
@@ -37,6 +38,46 @@ func getTagsByLivestreamID(livestreamID int64) ([]Tag, bool) {
 
 func InitTagsCache() {
 	tagsByLivestreamID = sync.Map{}
+}
+
+func setLivestreamModelsCache(livestreamID int64, livestreamModel LivestreamModel) {
+	LivestreamModelsCache.Store(livestreamID, livestreamModel)
+}
+
+func getLivestreamModelsCache(livestreamID int64) (LivestreamModel, bool) {
+	var livestreamModel LivestreamModel
+	livestreamModelAny, ok := LivestreamModelsCache.Load(livestreamID)
+	if !ok {
+		return livestreamModel, false
+	}
+
+	livestreamModel = livestreamModelAny.(LivestreamModel)
+	return livestreamModel, true
+}
+
+func InitLivestreamModelsCache(c echo.Context) error {
+	ctx := c.Request().Context()
+	LivestreamModelsCache = sync.Map{}
+	tx, err := dbConn.BeginTxx(ctx, nil)
+
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
+	}
+	defer tx.Rollback()
+
+	var livestreamModels []*LivestreamModel
+	if err := tx.SelectContext(ctx, &livestreamModels, "SELECT * FROM livestreams"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get total tip: "+err.Error())
+	}
+	for _, res := range livestreamModels {
+		setLivestreamModelsCache(res.ID, *res)
+	}
+
+	if err = tx.Commit(); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
+	}
+
+	return nil
 }
 
 type ReserveLivestreamRequest struct {
@@ -190,6 +231,7 @@ func reserveLivestreamHandler(c echo.Context) error {
 	if err := tx.Commit(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
+	setLivestreamModelsCache(livestreamID, *livestreamModel)
 
 	return c.JSON(http.StatusCreated, livestream)
 }
@@ -222,9 +264,9 @@ func searchLivestreamsHandler(c echo.Context) error {
 		}
 
 		for _, keyTaggedLivestream := range keyTaggedLivestreams {
-			ls := LivestreamModel{}
-			if err := tx.GetContext(ctx, &ls, "SELECT * FROM livestreams WHERE id = ?", keyTaggedLivestream.LivestreamID); err != nil {
-				return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestreams: "+err.Error())
+			ls, exists := getLivestreamModelsCache(keyTaggedLivestream.LivestreamID)
+			if !exists {
+				return echo.NewHTTPError(http.StatusInternalServerError, "live stream not found")
 			}
 
 			livestreamModels = append(livestreamModels, &ls)
@@ -434,13 +476,9 @@ func getLivestreamHandler(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	livestreamModel := LivestreamModel{}
-	err = tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID)
-	if errors.Is(err, sql.ErrNoRows) {
+	livestreamModel, exists := getLivestreamModelsCache(int64(livestreamID))
+	if !exists {
 		return echo.NewHTTPError(http.StatusNotFound, "not found livestream that has the given id")
-	}
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestream: "+err.Error())
 	}
 
 	livestream, err := fillLivestreamResponse(ctx, tx, livestreamModel)
@@ -473,9 +511,9 @@ func getLivecommentReportsHandler(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	var livestreamModel LivestreamModel
-	if err := tx.GetContext(ctx, &livestreamModel, "SELECT * FROM livestreams WHERE id = ?", livestreamID); err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get livestream: "+err.Error())
+	livestreamModel, ok := getLivestreamModelsCache(int64(livestreamID))
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "livestream not found")
 	}
 
 	// error already check
