@@ -190,8 +190,8 @@ func postIconHandler(c echo.Context) error {
 
 func notifyIconUpdated(username, iconHash string) {
 	urls := []string{
-		fmt.Sprintf("http://192.168.0.11/api/user/%s/icon/cache", username),
-		fmt.Sprintf("http://192.168.0.12/api/user/%s/icon/cache", username),
+		fmt.Sprintf("http://192.168.0.11:8080/api/user/%s/icon/cache", username),
+		fmt.Sprintf("http://192.168.0.12:8080/api/user/%s/icon/cache", username),
 	}
 
 	reqBody, err := json.Marshal(PostIconCacheRequest{IconHash: iconHash})
