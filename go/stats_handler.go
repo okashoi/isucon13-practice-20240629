@@ -29,8 +29,39 @@ func getScoreByLivestreamID(livestreamID int64) int64 {
 	return scoreAny.(int64)
 }
 
-func InitScoreCache() {
+func InitScoreCache(c echo.Context) error {
+	ctx := c.Request().Context()
 	scoreByLivestreamID = sync.Map{}
+
+	tx, err := dbConn.BeginTxx(ctx, nil)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
+	}
+	defer tx.Rollback()
+
+	var result1 []*struct {
+		LivestreamID int64 `db:"livestream_id"`
+		TotalTip     int64 `db:"total_tip"`
+	}
+	if err := tx.SelectContext(ctx, &result1, "SELECT ls.id as livestream_id, IFNULL(SUM(lc.tip), 0) as total_tip FROM livestreams ls LEFT JOIN livecomments lc ON ls.id = lc.livestream_id GROUP BY ls.id"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get total tip: "+err.Error())
+	}
+	for _, res := range result1 {
+		addScoreByLivestreamID(res.LivestreamID, res.TotalTip)
+	}
+
+	var result2 []*struct {
+		LivestreamID  int64 `db:"livestream_id"`
+		ReactionCount int64 `db:"reaction_count"`
+	}
+	if err := tx.SelectContext(ctx, &result2, "SELECT ls.id as livestream_id, COUNT(*) as reaction_count FROM livestreams ls LEFT JOIN reactions r ON ls.id = r.livestream_id GROUP BY ls.id"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get reaction count: "+err.Error())
+	}
+	for _, res := range result2 {
+		addScoreByLivestreamID(res.LivestreamID, res.ReactionCount)
+	}
+
+	return nil
 }
 
 type LivestreamStatistics struct {
