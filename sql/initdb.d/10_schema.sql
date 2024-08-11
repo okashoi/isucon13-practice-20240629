@@ -16,7 +16,7 @@ CREATE TABLE `icons` (
   `user_id` BIGINT NOT NULL,
   `image` LONGBLOB NOT NULL
 ) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_bin;
-create index icons_user_id_index on icons (user_id);
+create unique index icons_user_id_index on icons (user_id);
 
 -- ユーザごとのカスタムテーマ
 CREATE TABLE `themes` (
