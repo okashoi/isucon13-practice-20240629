@@ -120,8 +120,13 @@ func initializeHandler(c echo.Context) error {
 	InitTagsCache()
 	InitThemeCache()
 	updateUsersMap()
+	if err := InitScoreCache(c); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
+	if err := InitLivestreamModelsCache(c); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
+	}
 	resetSubDomains()
-	InitScoreCache(c)
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
