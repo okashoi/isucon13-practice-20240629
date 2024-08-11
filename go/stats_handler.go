@@ -247,7 +247,10 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 	// ランク算出
 	var ranking LivestreamRanking
 	for _, livestream := range livestreams {
-		score, _ := getScoreByLivestreamID(livestreamID)
+		score, ok := getScoreByLivestreamID(livestreamID)
+		if !ok {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get score by livestream_id")
+		}
 		ranking = append(ranking, LivestreamRankingEntry{
 			LivestreamID: livestream.ID,
 			Score:        score,
