@@ -324,7 +324,7 @@ func registerHandler(c echo.Context) error {
 	if _, err := tx.NamedExecContext(ctx, "INSERT INTO themes (user_id, dark_mode) VALUES(:user_id, :dark_mode)", themeModel); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to insert user theme: "+err.Error())
 	}
-	addSubDomain(req.Name+".t.isucon.pw.", "192.168.0.12")
+	addSubDomain(req.Name+".t.isucon.pw.", "192.168.0.11")
 	user, err := fillUserResponse(ctx, tx, userModel)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to fill user: "+err.Error())
