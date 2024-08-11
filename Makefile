@@ -27,7 +27,7 @@ start-services:
 	sudo systemctl start mysql
 	sudo systemctl start isupipe-go.service
 	sudo systemctl start nginx
-	sudo systemctl start pdns
+	sudo systemctl stop pdns
 	sudo systemctl start dnsdist
 
 kataribe: timestamp=$(shell TZ=Asia/Tokyo date "+%Y%m%d-%H%M%S")

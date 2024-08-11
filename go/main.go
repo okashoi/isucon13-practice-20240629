@@ -120,8 +120,8 @@ func initializeHandler(c echo.Context) error {
 	InitTagsCache()
 	InitThemeCache()
 	updateUsersMap()
+	resetSubDomains()
 	InitScoreCache(c)
-
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
@@ -161,6 +161,7 @@ func main() {
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
 
+	go startDNS()
 	e := echo.New()
 	e.Debug = false
 	e.Logger.SetLevel(echolog.OFF)
