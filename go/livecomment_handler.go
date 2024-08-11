@@ -403,7 +403,6 @@ func fillLivecommentResponse(ctx context.Context, tx *sqlx.Tx, livecommentModel 
 		Tip:        livecommentModel.Tip,
 		CreatedAt:  livecommentModel.CreatedAt,
 	}
-	time.Sleep(500 * time.Millisecond)
 	return livecomment, nil
 }
 
