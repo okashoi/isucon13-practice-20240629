@@ -264,7 +264,7 @@ type v2JSONSerializer struct {
 }
 
 func (s v2JSONSerializer) Serialize(c echo.Context, i interface{}, indent string) error {
-	return json.MarshalWrite(c.Response().Writer, i)
+	return json.MarshalWrite(c.Response(), i)
 }
 func (s v2JSONSerializer) Deserialize(c echo.Context, i interface{}) error {
 	return json.UnmarshalRead(c.Request().Body, i)
