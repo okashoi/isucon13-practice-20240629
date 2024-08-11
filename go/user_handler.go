@@ -87,6 +87,10 @@ type PostIconResponse struct {
 	ID int64 `json:"id"`
 }
 
+type PostIconCacheRequest struct {
+	IconHash string `json:"icon_hash"`
+}
+
 var (
 	iconHashCacheByUsername sync.Map
 )
@@ -181,6 +185,19 @@ func postIconHandler(c echo.Context) error {
 	return c.JSON(http.StatusCreated, &PostIconResponse{
 		ID: iconID,
 	})
+}
+
+func postIconCacheHandler(c echo.Context) error {
+	username := c.Param("username")
+
+	var req *PostIconCacheRequest
+	if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "failed to decode the request body as json")
+	}
+
+	addIconHashByUsername(username, req.IconHash)
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 func getMeHandler(c echo.Context) error {
