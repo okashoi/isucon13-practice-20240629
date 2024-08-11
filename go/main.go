@@ -221,6 +221,7 @@ func main() {
 	e.GET("/api/user/:username/statistics", getUserStatisticsHandler)
 	e.GET("/api/user/:username/icon", getIconHandler)
 	e.POST("/api/icon", postIconHandler)
+	e.POST("/api/user/:username/icon/cache", postIconCacheHandler)
 
 	// stats
 	// ライブ配信統計情報
