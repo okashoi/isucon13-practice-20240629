@@ -1,6 +1,8 @@
 module github.com/isucon/isucon13/webapp/go
 
-go 1.21
+go 1.22
+
+toolchain go1.22.6
 
 require (
 	github.com/go-sql-driver/mysql v1.7.1
@@ -15,6 +17,7 @@ require (
 
 require (
 	github.com/felixge/fgprof v0.9.4 // indirect
+	github.com/go-json-experiment/json v0.0.0-20240524174822-2d9f40f7385b // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/google/pprof v0.0.0-20240227163752-401108e1b7e7 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
