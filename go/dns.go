@@ -1332,7 +1332,7 @@ func startDNS() error {
 			defer muSubDomains.RUnlock()
 			if slices.Contains(subDomains, r.Question[0].Name) {
 				m.Answer = []dns.RR{
-					NewRR(r.Question[0].Name + " 120 IN A 192.168.0.11"),
+					NewRR(r.Question[0].Name + " 120 IN A 192.168.0.12"),
 				}
 			} else {
 				// NXDOMAINにする
