@@ -137,6 +137,7 @@ func postReactionHandler(c echo.Context) error {
 	if err := tx.Commit(); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to commit: "+err.Error())
 	}
+	addScoreByLivestreamID(int64(livestreamID), 1)
 
 	return c.JSON(http.StatusCreated, reaction)
 }

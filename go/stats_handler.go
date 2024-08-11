@@ -6,9 +6,63 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"sync"
 
 	"github.com/labstack/echo/v4"
 )
+
+var (
+	scoreByLivestreamID sync.Map
+)
+
+func addScoreByLivestreamID(livestreamID, score int64) {
+	currentScore := getScoreByLivestreamID(livestreamID)
+	scoreByLivestreamID.Store(livestreamID, currentScore+score)
+}
+
+func getScoreByLivestreamID(livestreamID int64) int64 {
+	scoreAny, ok := scoreByLivestreamID.Load(livestreamID)
+	if !ok {
+		return 0
+	}
+
+	return scoreAny.(int64)
+}
+
+func InitScoreCache(c echo.Context) error {
+	ctx := c.Request().Context()
+	scoreByLivestreamID = sync.Map{}
+
+	tx, err := dbConn.BeginTxx(ctx, nil)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to begin transaction: "+err.Error())
+	}
+	defer tx.Rollback()
+
+	var result1 []*struct {
+		LivestreamID int64 `db:"livestream_id"`
+		TotalTip     int64 `db:"total_tip"`
+	}
+	if err := tx.SelectContext(ctx, &result1, "SELECT ls.id as livestream_id, IFNULL(SUM(lc.tip), 0) as total_tip FROM livestreams ls INNER JOIN livecomments lc ON ls.id = lc.livestream_id GROUP BY ls.id"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get total tip: "+err.Error())
+	}
+	for _, res := range result1 {
+		addScoreByLivestreamID(res.LivestreamID, res.TotalTip)
+	}
+
+	var result2 []*struct {
+		LivestreamID  int64 `db:"livestream_id"`
+		ReactionCount int64 `db:"reaction_count"`
+	}
+	if err := tx.SelectContext(ctx, &result2, "SELECT ls.id as livestream_id, COUNT(*) as reaction_count FROM livestreams ls INNER JOIN reactions r ON ls.id = r.livestream_id GROUP BY ls.id"); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get reaction count: "+err.Error())
+	}
+	for _, res := range result2 {
+		addScoreByLivestreamID(res.LivestreamID, res.ReactionCount)
+	}
+
+	return nil
+}
 
 type LivestreamStatistics struct {
 	Rank           int64 `json:"rank"`
@@ -224,17 +278,7 @@ func getLivestreamStatisticsHandler(c echo.Context) error {
 	// ランク算出
 	var ranking LivestreamRanking
 	for _, livestream := range livestreams {
-		var reactions int64
-		if err := tx.GetContext(ctx, &reactions, "SELECT COUNT(*) FROM livestreams l INNER JOIN reactions r ON l.id = r.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count reactions: "+err.Error())
-		}
-
-		var totalTips int64
-		if err := tx.GetContext(ctx, &totalTips, "SELECT IFNULL(SUM(l2.tip), 0) FROM livestreams l INNER JOIN livecomments l2 ON l.id = l2.livestream_id WHERE l.id = ?", livestream.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to count tips: "+err.Error())
-		}
-
-		score := reactions + totalTips
+		score := getScoreByLivestreamID(livestream.ID)
 		ranking = append(ranking, LivestreamRankingEntry{
 			LivestreamID: livestream.ID,
 			Score:        score,

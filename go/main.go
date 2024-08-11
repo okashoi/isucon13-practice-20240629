@@ -120,6 +120,7 @@ func initializeHandler(c echo.Context) error {
 	InitTagsCache()
 	InitThemeCache()
 	updateUsersMap()
+	InitScoreCache(c)
 
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
