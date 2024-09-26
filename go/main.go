@@ -101,8 +101,8 @@ func connectDB(logger echo.Logger) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(100)
-	db.SetMaxIdleConns(100)
+	db.SetMaxOpenConns(64)
+	db.SetMaxIdleConns(64)
 
 	if err := db.Ping(); err != nil {
 		return nil, err
@@ -126,7 +126,7 @@ func initializeHandler(c echo.Context) error {
 	if err := InitLivestreamModelsCache(c); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to initialize: "+err.Error())
 	}
-
+	resetSubDomains()
 	c.Request().Header.Add("Content-Type", "application/json;charset=utf-8")
 	return c.JSON(http.StatusOK, InitializeResponse{
 		Language: "golang",
@@ -172,6 +172,7 @@ func main() {
 		log.Println(http.ListenAndServe(":6060", nil))
 	}()
 
+	go startDNS()
 	e := echo.New()
 	e.Debug = false
 	e.Logger.SetLevel(echolog.OFF)

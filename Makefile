@@ -30,7 +30,6 @@ start-services:
 	sudo systemctl start isupipe-go.service
 	ssh isucon-s2 "sudo systemctl start isupipe-go.service"
 	sudo systemctl start nginx
-	sudo systemctl start pdns
 	sudo systemctl start dnsdist
 
 kataribe: timestamp=$(shell TZ=Asia/Tokyo date "+%Y%m%d-%H%M%S")
